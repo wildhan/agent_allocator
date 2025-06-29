@@ -1,0 +1,33 @@
+# Binaries
+**/*.exe
+**/*.dll
+**/*.so
+**/*.dylib
+**/*.test
+
+# Build and output directories
+**/bin/
+**/build/
+**/dist/
+
+# Vendor directories
+**/vendor/
+
+# Go cache and workspace
+**/go.sum
+**/go.work
+
+# Env files
+**/.env
+**/.env.*
+
+# Logs
+**/*.log
+
+# IDE/editor
+**/.idea/
+**/.vscode/
+
+# OS files
+**/.DS_Store
+**/Thumbs.db

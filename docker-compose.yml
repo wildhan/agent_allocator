@@ -1,0 +1,22 @@
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  webhook_service:
+    build: ./webhook_service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+    env_file:
+      - webhook_service/.env
+
+  allocator_service:
+    build: ./allocator_service
+    depends_on:
+      - redis
+    env_file:
+      - allocator_service/.env
