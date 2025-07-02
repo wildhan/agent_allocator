@@ -45,12 +45,15 @@ func main() {
 
 	r.Get("/webhook", func(w http.ResponseWriter, r *http.Request) {
 		var req model.Request
+
+		// Decode the JSON request body
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
+		// Initialize the Redis data structure
 		data, err := json.Marshal(model.RedisData{
 			RoomID:      req.RoomID,
 			CandidateID: req.CandidateAgent.ID,
@@ -61,6 +64,8 @@ func main() {
 			return
 		}
 
+		// Save the data to Redis
+		// Using RPush to add the data to a list in Redis
 		err = client.RPush(ctx, "customers_queue", data).Err()
 		if err != nil {
 			http.Error(w, "Error saving to Redis", http.StatusInternalServerError)
@@ -68,7 +73,10 @@ func main() {
 		}
 	})
 
-	port := os.Getenv("PORT") // Get the port from environment variable
+	// Get the port from environment variable
+	port := os.Getenv("PORT")
+
+	// Listen on the specified port
 	fmt.Printf("Listening on port %s...", port)
 	http.ListenAndServe(":"+port, r)
 }

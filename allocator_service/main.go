@@ -47,6 +47,7 @@ func main() {
 			continue
 		}
 
+		// data[0] is the key, data[1] is the value
 		var customerData model.RedisData
 		err = json.Unmarshal([]byte(data[1]), &customerData)
 		if err != nil {
@@ -54,6 +55,7 @@ func main() {
 			continue
 		}
 
+		// Check if the room ID and candidate ID are valid
 		err = assignToAgent(customerData.RoomID, fmt.Sprintf("%d", customerData.CandidateID))
 		if err == nil {
 			fmt.Println("Successfully assigned agent:", customerData.CandidateID, "to room:", customerData.RoomID)
@@ -62,9 +64,10 @@ func main() {
 
 		fmt.Println("Failed to assign agent:", customerData.CandidateID, "to room:", customerData.RoomID, "Error:", err)
 
+		// If assignment failed, try to allocate and assign an agent
 		err = allocateAndAssignToAgent(customerData.RoomID)
 		if err == nil {
-			fmt.Println("Successfully allocate assigned agent:", customerData.CandidateID, "to room:", customerData.RoomID)
+			fmt.Println("Successfully allocate assigned agent to room:", customerData.RoomID)
 			continue
 		}
 
@@ -98,18 +101,23 @@ func assignToAgent(roomID string, candidateID string) error {
 	data.Set("room_id", roomID)
 	data.Set("max_agent", os.Getenv("MAX_AGENTS"))
 
+	// Construct the API endpoint
+	// Assuming the base URL is set in the environment variable OMNI_BASE_URL
 	api := fmt.Sprintf("%s/api/v1/admin/service/assign_agent", baseUrl)
 
+	// Create a new HTTP request
 	req, err := http.NewRequest("POST", api, strings.NewReader(data.Encode()))
 	if err != nil {
 		fmt.Println("Error saat buat request:", err)
 		return err
 	}
 
+	// Set the necessary headers
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Qiscus-App-Id", os.Getenv("OMNI_API_KEY"))
 	req.Header.Set("Qiscus-Secret-Key", os.Getenv("OMNI_API_SECRET"))
 
+	// Send the request
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -118,6 +126,8 @@ func assignToAgent(roomID string, candidateID string) error {
 	}
 	defer resp.Body.Close()
 
+	// Check the response status code
+	// If the status code is not 200 OK, return an error
 	if resp.StatusCode != http.StatusOK {
 		fmt.Println("Assign API responded with status:", resp.StatusCode)
 		return fmt.Errorf("assign API responded with status %d", resp.StatusCode)
@@ -132,18 +142,23 @@ func allocateAndAssignToAgent(roomID string) error {
 	data := url.Values{}
 	data.Set("room_id", roomID)
 
+	// Construct the API endpoint
+	// Assuming the base URL is set in the environment variable OMNI_BASE_URL
 	api := fmt.Sprintf("%s/api/v1/admin/service/allocate_assign_agent", baseUrl)
 
+	// Create a new HTTP request
 	req, err := http.NewRequest("POST", api, strings.NewReader(data.Encode()))
 	if err != nil {
 		fmt.Println("Error saat buat request:", err)
 		return err
 	}
 
+	// Set the necessary headers
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Qiscus-App-Id", os.Getenv("OMNI_API_KEY"))
 	req.Header.Set("Qiscus-Secret-Key", os.Getenv("OMNI_API_SECRET"))
 
+	// Send the request
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -152,6 +167,8 @@ func allocateAndAssignToAgent(roomID string) error {
 	}
 	defer resp.Body.Close()
 
+	// Check the response status code
+	// If the status code is not 200 OK, return an error
 	if resp.StatusCode != http.StatusOK {
 		fmt.Println("Allocate and Assign API responded with status:", resp.StatusCode)
 		return fmt.Errorf("alocate and assign API responded with status %d", resp.StatusCode)
