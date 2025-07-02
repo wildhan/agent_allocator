@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 	"webhook_service/model"
 
 	"github.com/go-chi/chi/v5"
@@ -23,10 +24,24 @@ func main() {
 	r.Use(middleware.Logger) // Log the request
 	r.Use(middleware.Recoverer)
 
-	redisAddr := os.Getenv("REDIS_ADDR")
-	client := redis.NewClient(&redis.Options{
-		Addr: redisAddr, // Redis server address
-	})
+	// Initialize Redis client
+	var client *redis.Client
+	for {
+		fmt.Println("Connecting to Redis...")
+
+		redisAddr := os.Getenv("REDIS_ADDR")
+		opt, _ := redis.ParseURL(redisAddr)
+		client = redis.NewClient(opt)
+
+		err := client.Ping(ctx).Err()
+		if err == nil {
+			fmt.Println("Connected to Redis successfully!")
+			break // Exit the loop if Redis is reachable
+		}
+		fmt.Println("Failed to connect to Redis, retrying in 5 seconds...")
+		fmt.Println("Error:", err)
+		time.Sleep(5 * time.Second) // Wait before retrying
+	}
 
 	r.Get("/webhook", func(w http.ResponseWriter, r *http.Request) {
 		var req model.Request

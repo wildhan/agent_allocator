@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/joho/godotenv"
@@ -19,10 +20,23 @@ var ctx = context.Background()
 func main() {
 	godotenv.Load(".env") // Load environment variables from .env file
 
-	redisAddr := os.Getenv("REDIS_ADDR")
-	client := redis.NewClient(&redis.Options{
-		Addr: redisAddr, // Redis server address
-	})
+	var client *redis.Client
+	for {
+		fmt.Println("Connecting to Redis...")
+
+		redisAddr := os.Getenv("REDIS_ADDR")
+		opt, _ := redis.ParseURL(redisAddr)
+		client = redis.NewClient(opt)
+
+		err := client.Ping(ctx).Err()
+		if err == nil {
+			fmt.Println("Connected to Redis successfully!")
+			break // Exit the loop if Redis is reachable
+		}
+		fmt.Println("Failed to connect to Redis, retrying in 5 seconds...")
+		fmt.Println("Error:", err)
+		time.Sleep(5 * time.Second) // Wait before retrying
+	}
 
 	fmt.Println("Allocator Service started...")
 	for {
