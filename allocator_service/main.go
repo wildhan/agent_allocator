@@ -54,12 +54,24 @@ func main() {
 			continue
 		}
 
-		fmt.Println("Failed to allocate and assign agent:", customerData.CandidateID, "to room:", customerData.RoomID, "Error:", err)
+		fmt.Println("Failed to allocate and assign agent to room:", customerData.RoomID, "Error:", err)
 
-		err = client.RPush(ctx, "customers_queue", data).Err()
-		if err != nil {
-			fmt.Println("Error saving to Redis", "Error:", err)
-			continue
+		// If both assignment and allocation failed, save the data back to the queue
+		// Increment the retry count and check if it is less than 3
+		// If retry count is less than 3, re-add to the queue for retry
+		if customerData.RetryCount < 3 {
+			customerData.RetryCount++
+			fmt.Println("Retrying to assign agent:", customerData.CandidateID, "to room:", customerData.RoomID, "Retry count:", customerData.RetryCount)
+			newData, err := json.Marshal(customerData)
+			if err != nil {
+				fmt.Println("Error marshalling data for retry:", err)
+				continue
+			}
+			err = client.RPush(ctx, "customers_queue", newData).Err()
+			if err != nil {
+				fmt.Println("Error saving to Redis", "Error:", err)
+				continue
+			}
 		}
 	}
 }

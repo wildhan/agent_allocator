@@ -39,6 +39,7 @@ func main() {
 		data, err := json.Marshal(model.RedisData{
 			RoomID:      req.RoomID,
 			CandidateID: req.CandidateAgent.ID,
+			RetryCount:  0, // Initialize retry count to 0
 		})
 		if err != nil {
 			http.Error(w, "Error processing request", http.StatusInternalServerError)
