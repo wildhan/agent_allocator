@@ -43,7 +43,7 @@ func main() {
 		time.Sleep(5 * time.Second) // Wait before retrying
 	}
 
-	r.Get("/webhook", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/webhook", func(w http.ResponseWriter, r *http.Request) {
 		var req model.Request
 
 		// Decode the JSON request body
