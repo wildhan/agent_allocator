@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -56,21 +57,39 @@ func main() {
 		fmt.Printf("Received request: %+v\n", req)
 
 		// Initialize the Redis data structure
-		data, err := json.Marshal(model.RedisData{
+		customerData := model.RedisData{
 			RoomID:      req.RoomID,
 			CandidateID: req.CandidateAgent.ID,
 			RetryCount:  0, // Initialize retry count to 0
-		})
+		}
+		data, err := json.Marshal(customerData)
 		if err != nil {
 			http.Error(w, "Error processing request", http.StatusInternalServerError)
 			return
 		}
 
-		// Save the data to Redis
-		// Using RPush to add the data to a list in Redis
-		err = client.RPush(ctx, "customers_queue", data).Err()
+		// Add the RoomID to a Redis SET to ensure uniqueness
+		// Using SAdd to add the RoomID to a set in Redis
+		added, err := client.SAdd(ctx, "customers_index", customerData.RoomID).Result()
 		if err != nil {
-			http.Error(w, "Error saving to Redis", http.StatusInternalServerError)
+			log.Fatalf("Gagal menambahkan ke SET: %v", err)
+		}
+
+		// If the RoomID was added to the set, proceed to save the data
+		// If added > 0, it means the RoomID was not already present in the set
+		if added > 0 {
+			// Save the data to Redis
+			// Using RPush to add the data to a list in Redis
+			err = client.RPush(ctx, "customers_queue", data).Err()
+			if err != nil {
+				http.Error(w, "Error saving to Redis", http.StatusInternalServerError)
+				return
+			}
+			fmt.Printf("Add on queue: %+v\n", req)
+		} else {
+			// If the RoomID already exists, return an error
+			fmt.Printf("RoomID already exist: %+v\n", req)
+			http.Error(w, "RoomID already exist", http.StatusConflict)
 			return
 		}
 	})

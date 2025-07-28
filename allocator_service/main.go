@@ -75,6 +75,10 @@ func main() {
 			err = assignToAgent(customerData.RoomID, fmt.Sprintf("%d", customerData.CandidateID))
 			if err == nil {
 				fmt.Println("Successfully assigned agent:", customerData.CandidateID, "to room:", customerData.RoomID)
+				_, err = client.SRem(ctx, "customers_index", customerData.RoomID).Result()
+				if err != nil {
+					fmt.Printf("Gagal menghapus dari index SET: %v", err)
+				}
 				continue
 			}
 
@@ -94,6 +98,10 @@ func main() {
 					err = assignToAgent(customerData.RoomID, strconv.Itoa(newCandidateAgent.ID))
 					if err == nil {
 						fmt.Println("Successfully assigned agent:", newCandidateAgent.ID, "to room:", customerData.RoomID)
+						_, err = client.SRem(ctx, "customers_index", customerData.RoomID).Result()
+						if err != nil {
+							fmt.Printf("Gagal menghapus dari index SET: %v", err)
+						}
 						break // Exit the loop if assignment is successful
 					}
 					fmt.Println("Failed to assign agent:", newCandidateAgent.ID, "to room:", customerData.RoomID, "Error:", err)
