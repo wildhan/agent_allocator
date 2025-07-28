@@ -102,33 +102,6 @@ func main() {
 				}
 			}
 		}
-
-		// If assignment failed, try to allocate and assign an agent
-		// err = allocateAndAssignToAgent(customerData.RoomID)
-		// if err == nil {
-		// 	fmt.Println("Successfully allocate assigned agent to room:", customerData.RoomID)
-		// 	continue
-		// }
-
-		// fmt.Println("Failed to allocate and assign agent to room:", customerData.RoomID, "Error:", err)
-
-		// If both assignment and allocation failed, save the data back to the queue
-		// Increment the retry count and check if it is less than 3
-		// If retry count is less than 3, re-add to the queue for retry
-		// if customerData.RetryCount < 3 {
-		// 	customerData.RetryCount++
-		// 	fmt.Println("Retrying to assign agent:", customerData.CandidateID, "to room:", customerData.RoomID, "Retry count:", customerData.RetryCount)
-		// 	newData, err := json.Marshal(customerData)
-		// 	if err != nil {
-		// 		fmt.Println("Error marshalling data for retry:", err)
-		// 		continue
-		// 	}
-		// 	err = client.RPush(ctx, "customers_queue", newData).Err()
-		// 	if err != nil {
-		// 		fmt.Println("Error saving to Redis", "Error:", err)
-		// 		continue
-		// 	}
-		// }
 	}
 }
 
@@ -173,47 +146,6 @@ func assignToAgent(roomID string, candidateID string) error {
 	if resp.StatusCode != http.StatusOK {
 		fmt.Println("Assign API responded with status:", resp.StatusCode)
 		return fmt.Errorf("assign API responded with status %d", resp.StatusCode)
-	}
-
-	return nil
-}
-
-func allocateAndAssignToAgent(roomID string) error {
-	baseUrl := os.Getenv("OMNI_BASE_URL")
-
-	data := url.Values{}
-	data.Set("room_id", roomID)
-
-	// Construct the API endpoint
-	// Assuming the base URL is set in the environment variable OMNI_BASE_URL
-	api := fmt.Sprintf("%s/api/v1/admin/service/allocate_assign_agent", baseUrl)
-
-	// Create a new HTTP request
-	req, err := http.NewRequest("POST", api, strings.NewReader(data.Encode()))
-	if err != nil {
-		fmt.Println("Error saat buat request:", err)
-		return err
-	}
-
-	// Set the necessary headers
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Qiscus-App-Id", os.Getenv("OMNI_API_KEY"))
-	req.Header.Set("Qiscus-Secret-Key", os.Getenv("OMNI_API_SECRET"))
-
-	// Send the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("Error saat request:", err)
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Check the response status code
-	// If the status code is not 200 OK, return an error
-	if resp.StatusCode != http.StatusOK {
-		fmt.Println("Allocate and Assign API responded with status:", resp.StatusCode)
-		return fmt.Errorf("alocate and assign API responded with status %d", resp.StatusCode)
 	}
 
 	return nil
