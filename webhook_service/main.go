@@ -53,6 +53,8 @@ func main() {
 			return
 		}
 
+		fmt.Printf("Received request: %+v\n", req)
+
 		// Initialize the Redis data structure
 		data, err := json.Marshal(model.RedisData{
 			RoomID:      req.RoomID,
