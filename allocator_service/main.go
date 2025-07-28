@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,13 @@ var ctx = context.Background()
 
 func main() {
 	godotenv.Load(".env") // Load environment variables from .env file
+
+	maxCustomerString := os.Getenv("MAX_AGENTS")
+	maxCustomers := -1
+	if maxCustomerString != "" {
+		maxCustomers, _ = strconv.Atoi(maxCustomerString)
+	}
+	fmt.Println("Maximum customer count:", maxCustomers)
 
 	var client *redis.Client
 	for {
@@ -51,55 +59,69 @@ func main() {
 		var customerData model.RedisData
 		err = json.Unmarshal([]byte(data[1]), &customerData)
 		if err != nil {
-			fmt.Println("Error unmarshalling data:", err)
+			fmt.Println("Error unmarshalling data: ", err)
+			continue
+		}
+		fmt.Printf("Processing customer data: %+v\n", customerData)
+
+		countCustomer, err := getAgentById(customerData.CandidateID)
+		if err != nil || countCustomer == -1 {
+			fmt.Println("Error getting agent by ID: ", err)
 			continue
 		}
 
-		// Check if the room ID and candidate ID are valid
-		err = assignToAgent(customerData.RoomID, fmt.Sprintf("%d", customerData.CandidateID))
-		if err == nil {
-			fmt.Println("Successfully assigned agent:", customerData.CandidateID, "to room:", customerData.RoomID)
-			continue
-		}
+		if countCustomer < maxCustomers || maxCustomers == -1 {
+			// Check if the room ID and candidate ID are valid
+			err = assignToAgent(customerData.RoomID, fmt.Sprintf("%d", customerData.CandidateID))
+			if err == nil {
+				fmt.Println("Successfully assigned agent:", customerData.CandidateID, "to room:", customerData.RoomID)
+				continue
+			}
 
-		fmt.Println("Failed to assign agent:", customerData.CandidateID, "to room:", customerData.RoomID, "Error:", err)
+			fmt.Println("Failed to assign agent:", customerData.CandidateID, "to room:", customerData.RoomID, "Error:", err)
+		} else {
+			fmt.Println("Agent:", customerData.CandidateID, "has reached the maximum customer count, Please wait for the next available agent.")
+		}
 
 		// If assignment failed, try to allocate and assign an agent
-		err = allocateAndAssignToAgent(customerData.RoomID)
-		if err == nil {
-			fmt.Println("Successfully allocate assigned agent to room:", customerData.RoomID)
-			continue
-		}
+		// err = allocateAndAssignToAgent(customerData.RoomID)
+		// if err == nil {
+		// 	fmt.Println("Successfully allocate assigned agent to room:", customerData.RoomID)
+		// 	continue
+		// }
 
-		fmt.Println("Failed to allocate and assign agent to room:", customerData.RoomID, "Error:", err)
+		// fmt.Println("Failed to allocate and assign agent to room:", customerData.RoomID, "Error:", err)
 
 		// If both assignment and allocation failed, save the data back to the queue
 		// Increment the retry count and check if it is less than 3
 		// If retry count is less than 3, re-add to the queue for retry
-		if customerData.RetryCount < 3 {
-			customerData.RetryCount++
-			fmt.Println("Retrying to assign agent:", customerData.CandidateID, "to room:", customerData.RoomID, "Retry count:", customerData.RetryCount)
-			newData, err := json.Marshal(customerData)
-			if err != nil {
-				fmt.Println("Error marshalling data for retry:", err)
-				continue
-			}
-			err = client.RPush(ctx, "customers_queue", newData).Err()
-			if err != nil {
-				fmt.Println("Error saving to Redis", "Error:", err)
-				continue
-			}
-		}
+		// if customerData.RetryCount < 3 {
+		// 	customerData.RetryCount++
+		// 	fmt.Println("Retrying to assign agent:", customerData.CandidateID, "to room:", customerData.RoomID, "Retry count:", customerData.RetryCount)
+		// 	newData, err := json.Marshal(customerData)
+		// 	if err != nil {
+		// 		fmt.Println("Error marshalling data for retry:", err)
+		// 		continue
+		// 	}
+		// 	err = client.RPush(ctx, "customers_queue", newData).Err()
+		// 	if err != nil {
+		// 		fmt.Println("Error saving to Redis", "Error:", err)
+		// 		continue
+		// 	}
+		// }
 	}
 }
 
 func assignToAgent(roomID string, candidateID string) error {
 	baseUrl := os.Getenv("OMNI_BASE_URL")
+	ominApiKey := os.Getenv("OMNI_API_KEY")
+	ominApiSecret := os.Getenv("OMNI_API_SECRET")
+
+	fmt.Println("Assigning agent:", candidateID, "to room:", roomID)
 
 	data := url.Values{}
 	data.Set("agent_id", candidateID)
 	data.Set("room_id", roomID)
-	data.Set("max_agent", os.Getenv("MAX_AGENTS"))
 
 	// Construct the API endpoint
 	// Assuming the base URL is set in the environment variable OMNI_BASE_URL
@@ -114,8 +136,8 @@ func assignToAgent(roomID string, candidateID string) error {
 
 	// Set the necessary headers
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Qiscus-App-Id", os.Getenv("OMNI_API_KEY"))
-	req.Header.Set("Qiscus-Secret-Key", os.Getenv("OMNI_API_SECRET"))
+	req.Header.Set("Qiscus-App-Id", ominApiKey)
+	req.Header.Set("Qiscus-Secret-Key", ominApiSecret)
 
 	// Send the request
 	client := &http.Client{}
@@ -175,4 +197,58 @@ func allocateAndAssignToAgent(roomID string) error {
 	}
 
 	return nil
+}
+
+func getAgentById(candidateID int) (int, error) {
+	baseUrl := os.Getenv("OMNI_BASE_URL")
+	ominApiKey := os.Getenv("OMNI_API_KEY")
+	ominApiSecret := os.Getenv("OMNI_API_SECRET")
+
+	api := fmt.Sprintf("%s/api/v1/admin/agents/get_by_ids?ids[]=%d", baseUrl, candidateID)
+	fmt.Println("Fetching agent by ID:", candidateID)
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("GET", api, nil)
+	if err != nil {
+		fmt.Println("Error saat buat request:", err)
+		return -1, err
+	}
+
+	// Set the necessary headers
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Qiscus-App-Id", ominApiKey)
+	req.Header.Set("Qiscus-Secret-Key", ominApiSecret)
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error saat request:", err)
+		return -1, err
+	}
+	defer resp.Body.Close()
+
+	// Check the response status code
+	// If the status code is not 200 OK, return an error
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Assign API responded with status:", resp.StatusCode)
+		return -1, fmt.Errorf("assign API responded with status %d", resp.StatusCode)
+	}
+
+	var response model.ResponseGetAgent
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		fmt.Println("Error decoding response body:", err)
+		return -1, fmt.Errorf("invalid request body: %v", err)
+	}
+
+	fmt.Printf("Received agent: %+v\n", response)
+	if len(response.Data) > 0 {
+		agent := response.Data[0]
+		return agent.CurrentCustomerCount, nil
+	} else {
+		fmt.Println("No agent found with ID:", candidateID)
+		return -1, fmt.Errorf("no agent found with ID %d", candidateID)
+	}
+
 }
