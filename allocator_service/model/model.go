@@ -6,7 +6,7 @@ type RedisData struct {
 	RetryCount  int    `json:"retry_count"`
 }
 
-type ResponseGetAgent struct {
+type ResponseGetAgentByID struct {
 	Data []Agent `json:"data"`
 }
 
@@ -14,4 +14,12 @@ type Agent struct {
 	ID                   int    `json:"id"`
 	Name                 string `json:"name"`
 	CurrentCustomerCount int    `json:"current_customer_count"`
+}
+
+type ResponseGetAvailableAgent struct {
+	Data data `json:"data"`
+}
+
+type data struct {
+	Agents []Agent `json:"agents"`
 }

@@ -81,6 +81,26 @@ func main() {
 			fmt.Println("Failed to assign agent:", customerData.CandidateID, "to room:", customerData.RoomID, "Error:", err)
 		} else {
 			fmt.Println("Agent:", customerData.CandidateID, "has reached the maximum customer count, Please wait for the next available agent.")
+			for {
+				time.Sleep(5 * time.Second) // Wait before retrying
+				newCandidateAgent, err := getAvailableAgent(customerData.RoomID, maxCustomers)
+				if err != nil {
+					fmt.Println("Error getting available agent:", err)
+					continue
+				}
+
+				if newCandidateAgent != nil {
+					fmt.Println("Found available agent:", newCandidateAgent.ID, "for room:", customerData.RoomID)
+					err = assignToAgent(customerData.RoomID, strconv.Itoa(newCandidateAgent.ID))
+					if err == nil {
+						fmt.Println("Successfully assigned agent:", newCandidateAgent.ID, "to room:", customerData.RoomID)
+						break // Exit the loop if assignment is successful
+					}
+					fmt.Println("Failed to assign agent:", newCandidateAgent.ID, "to room:", customerData.RoomID, "Error:", err)
+				} else {
+					fmt.Println("No available agents found, retrying...")
+				}
+			}
 		}
 
 		// If assignment failed, try to allocate and assign an agent
@@ -235,7 +255,7 @@ func getAgentById(candidateID int) (int, error) {
 		return -1, fmt.Errorf("assign API responded with status %d", resp.StatusCode)
 	}
 
-	var response model.ResponseGetAgent
+	var response model.ResponseGetAgentByID
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		fmt.Println("Error decoding response body:", err)
@@ -250,5 +270,64 @@ func getAgentById(candidateID int) (int, error) {
 		fmt.Println("No agent found with ID:", candidateID)
 		return -1, fmt.Errorf("no agent found with ID %d", candidateID)
 	}
+}
 
+func getAvailableAgent(roomID string, maxCustommer int) (*model.Agent, error) {
+	baseUrl := os.Getenv("OMNI_BASE_URL")
+	ominApiKey := os.Getenv("OMNI_API_KEY")
+	ominApiSecret := os.Getenv("OMNI_API_SECRET")
+
+	api := fmt.Sprintf("%s/api/v2/admin/service/available_agents?room_id=%s", baseUrl, roomID)
+	fmt.Println("Fetching available agents for room ID:", roomID)
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("GET", api, nil)
+	if err != nil {
+		fmt.Println("Error saat buat request:", err)
+		return nil, err
+	}
+
+	// Set the necessary headers
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Qiscus-App-Id", ominApiKey)
+	req.Header.Set("Qiscus-Secret-Key", ominApiSecret)
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error saat request:", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Check the response status code
+	// If the status code is not 200 OK, return an error
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Assign API responded with status:", resp.StatusCode)
+		return nil, fmt.Errorf("assign API responded with status %d", resp.StatusCode)
+	}
+
+	var response model.ResponseGetAvailableAgent
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		fmt.Println("Error decoding response body:", err)
+		return nil, fmt.Errorf("invalid request body: %v", err)
+	}
+
+	fmt.Printf("Received agent: %+v\n", response)
+	var selectedAgent *model.Agent = nil
+	if len(response.Data.Agents) > 0 {
+		for _, agent := range response.Data.Agents {
+			if agent.CurrentCustomerCount < maxCustommer {
+				selectedAgent = &agent
+				break
+			}
+		}
+	} else {
+		fmt.Println("No available agents found for room ID:", roomID)
+		return nil, fmt.Errorf("no available agents found for room ID %s", roomID)
+	}
+
+	return selectedAgent, nil
 }
